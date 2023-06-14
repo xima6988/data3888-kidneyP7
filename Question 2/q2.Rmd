@@ -1,0 +1,508 @@
+---
+title: 'Research Question 2: Identify the the most significant blood genes for the kidney transplant within two different dataset, using maching learning model to predict the outcome of the transplant.'
+output: 
+  html_document:
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    number_sections: true # (Optional) Puts numbers next to heading/subheadings
+table-of-contents: true # (Optional) Creates a table of contents!
+number-sections: true # (Optional) Puts numbers next to heading/subheadings
+date: "2023-05-27"
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(DT)
+library(ggplot2)
+library(viridis)
+library(cvTools)
+library(dplyr)
+library(maps)
+library(tidyverse)
+library(ggplot2)
+library(devtools)
+library(tsfeatures)
+library(ggpubr)
+library(janitor)
+library(reshape2)
+library(leaflet)
+library(GEOquery)
+library(Biobase)
+library(limma)
+library(tidyverse)
+library(class)
+library(cvTools)
+library(tuneR)
+library(e1071)
+library(randomForest)
+library(raster)
+library(data.table)
+library(patchwork)
+
+```
+# Oveview
+In research question 2, We try to Identify the the most significant blood genes for the kidney transplant within two different dataset, using maching learning model to predict the outcome of the transplant.
+
+# Data Processing
+Loading the dataset to be used in the research question 2.GSE15296 is the dataset for acute kidney transplant rejection in peripheral blood by whole genome gene expression profiling.GSE14346 is the dataset for peripheral blood diagnostic test for acute rejection in renal transplantation.
+
+```{r}
+gse15296 <- getGEO("GSE15296", GSEMatrix = TRUE,AnnotGPL=TRUE)[[1]]
+gse14346 <- getGEO("GSE14346", GSEMatrix = TRUE,AnnotGPL=TRUE)[[1]]
+```
+
+
+# Explortary Data Analysis
+
+## Log transformation
+Using the boxplot and exprs matrix to check if the data is log transformed. From the graph generated below, we can state that both gse14346 and gse15296 have not been log transformed.
+```{r}
+boxplot(exprs(gse15296), outline = FALSE, main = "Expression values of gse15296")
+boxplot(exprs(gse14346), outline = FALSE, main = "Expression values of gse14346")
+```
+Since both datasets are not log transformed, We perform the log transformation on both dataset.The purpose of performing the log transformation on the dataset is to reduce the skewness of the data and make it more normally distributed. It allows to apply statistical tests and models which could be deployed on normally distributed data. Log transformation can also reduce the disturb caused by outliers and make the data more homogeneous. 
+
+The chunk below is to perform the log transformation on the dataset gse14346.
+
+```{r}
+fvarLabels(gse14346) <- make.names(fvarLabels(gse14346))
+# load series and platform data from GEO
+
+# make proper column names to match toptable 
+fvarLabels(gse14346) <- make.names(fvarLabels(gse14346))
+
+# group names for all samples
+gsms <- "undefined"
+sml <- c()
+for (i in 1:nchar(gsms)) { sml[i] <- substr(gsms,i,i) }
+
+# log2 transform
+ex <- exprs(gse14346)
+qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+LogC <- (qx[5] > 100) ||
+          (qx[6]-qx[1] > 50 && qx[2] > 0) ||
+          (qx[2] > 0 && qx[2] < 1 && qx[4] > 1 && qx[4] < 2)
+if (LogC) { ex[which(ex <= 0)] <- NaN
+  exprs(gse14346) <- log2(ex) }
+
+boxplot(exprs(gse14346), outline = FALSE, main = "Expression values of gse14346 after log transformation")
+```
+The chunk below is to perform the log transformation on the dataset gse15296.
+```{r}
+fvarLabels(gse15296) <- make.names(fvarLabels(gse15296))
+# load series and platform data from GEO
+
+# make proper column names to match toptable 
+fvarLabels(gse15296) <- make.names(fvarLabels(gse15296))
+
+# group names for all samples
+gsms <- "undefined"
+sml <- c()
+for (i in 1:nchar(gsms)) { sml[i] <- substr(gsms,i,i) }
+
+# log2 transform
+ex <- exprs(gse15296)
+qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+LogC <- (qx[5] > 100) ||
+          (qx[6]-qx[1] > 50 && qx[2] > 0) ||
+          (qx[2] > 0 && qx[2] < 1 && qx[4] > 1 && qx[4] < 2)
+if (LogC) { ex[which(ex <= 0)] <- NaN
+  exprs(gse15296) <- log2(ex) }
+
+boxplot(exprs(gse15296), outline = FALSE,  main = "Expression values of gse15296 after log transformation")
+```
+## Normal distribution
+
+We run multiple tests on both dataset using the imFit() function to fit the samples into a linear model. For each feature, the eBayes() empirical Bayes method moderated the t-statistics and p-values. Using QQ plot, there are a few outliers at the end, but the majority of the samples fall on a straight line, thus the data using are normally distributed.
+```{r}
+featureData <- fData(gse15296)
+cl <- factor(sample(c("YES", "NO"), 80, replace=TRUE))
+fakeX <- matrix(rnorm(10000*80), nrow=10000)
+design <- model.matrix(~ cl + 0 )
+fakefit <- lmFit(fakeX, design)
+cont.matrix <- makeContrasts(clYES - clNO, levels=design)
+fakefit2 <- contrasts.fit(fakefit, cont.matrix)
+fakefit2 <- eBayes(fakefit2)
+
+qqnorm(fakefit2$t,main = "QQ plot for GSE15296")
+abline(0,1)
+```
+Same process goes for gse14346, first log2 transform the data and then use normal qq plot to demostrate whether it is showing a linear relation, as we can see it has a similar outcome as the one in 15296.
+```{r}
+featureData <- fData(gse14346)
+cl <- factor(sample(c("YES", "NO"), 80, replace=TRUE))
+fakeX <- matrix(rnorm(10000*80), nrow=10000)
+design <- model.matrix(~ cl + 0 )
+fakefit <- lmFit(fakeX, design)
+cont.matrix <- makeContrasts(clYES - clNO, levels=design)
+fakefit2 <- contrasts.fit(fakefit, cont.matrix)
+fakefit2 <- eBayes(fakefit2)
+
+qqnorm(fakefit2$t,main = "QQ plot for GSE14346")
+abline(0,1)
+```
+## Principle Component Analysis
+Principal Component Analysis(Jaadi.Z), which is a dimensionality-reduction method that is often used to reduce the number of variables in a large dataset by transforming them into a smaller set of variables that still contain most of the information in the original dataset. PCA can help to simplify the data, remove noise, and identify patterns. PCA can also be used for data visualization, clustering, feature extraction, and regression. 
+
+Add a new column of variable, Outcome to show the result in the given gse dataset. As the result is in the form of AR and Non-AR. Using ifelse function to create a new column is easier for later analysis process.
+
+```{r}
+gse15296$Outcome = ifelse(grepl("AR", gse15296$title), "Rejection", "Stable")
+gse14346$Outcome = ifelse(grepl("AR", gse14346$title), "Rejection", "Stable")
+```
+By using the pca plot, there is a clear separation between the stable and rejection patients. The two outcomes for the patients are easily distinguished. 
+```{r}
+gse_pca15296 <- prcomp(t(exprs(gse15296)))
+df_toplot <- data.frame(gse15296$Outcome, 
+                        pc1 = gse_pca15296$x[,1], pc2 = gse_pca15296$x[,2]  )
+g <- ggplot(df_toplot, aes(x = pc1, y = pc2, color = gse15296.Outcome)) + 
+  geom_point(size = 4) + 
+  theme_minimal() 
+g
+```
+
+Same process goes for gse14346
+```{r}
+gse_pca14346 <- prcomp(t(exprs(gse14346)))
+df_toplot <- data.frame(gse14346$Outcome, 
+                        pc1 = gse_pca14346$x[,1], pc2 = gse_pca14346$x[,2]  )
+
+df_filtered <- df_toplot[df_toplot$pc1 < 0,]
+g <- ggplot(df_filtered, aes(x = pc1, y = pc2, color = gse14346.Outcome)) + 
+  geom_point(size = 4) + 
+  theme_minimal() 
+g
+```
+
+#Data Analysis
+
+## Initial Stage
+Using DE genes(a special t-test function specifically designed for gse/medical datasets) to find highly differential expressed genes between stable and rejection patients, select the top 300 differentiated expressed genes in both datasets, gse15296 and gse14346. Top 300 genes is used for more diversity thus it could identify the genes more accurately.
+```{r}
+featureData15296 <- fData(gse15296)
+design15296 <- model.matrix(~Outcome, data = pData(gse15296))
+fit15296 <- lmFit(exprs(gse15296), design15296)
+fit15296 <- eBayes(fit15296)
+
+
+tT15296 <- topTable(fit15296, n = Inf, adjust.method = "BH", sort.by = "p") 
+gse15296_top = tT15296[1:300,] %>% rownames()
+
+gse15296_top
+```
+
+```{r}
+featureData14346<- fData(gse14346)
+design14346 <- model.matrix(~Outcome, data = pData(gse14346))
+fit14346 <- lmFit(exprs(gse14346), design14346)
+fit14346 <- eBayes(fit14346)
+
+tT14346 <- topTable(fit14346, n = Inf, adjust.method = "BH", sort.by = "p") 
+gse14346_top = tT14346[1:300,] %>% rownames()
+gse14346_top
+```
+
+Use intersect function to find the genes which plays vital roles in determine the result for both datasets. This is the result we need for the research question.
+```{r}
+intersect(gse14346_top,gse15296_top)
+```
+
+
+```{r}
+fit_oot1 <- topTable(fit15296, genelist = featureData15296[, "ID"], n = Inf) |> 
+  rownames_to_column("row") |> 
+  filter(!is.na(ID)) |> 
+  filter(ID != "") |> 
+  group_by(ID) |> 
+  filter(P.Value == min(P.Value)) |> 
+  pull(row)
+
+gse_oot1 <- gse15296[fit_oot1]
+gse_oot1$Outcome = ifelse(grepl("AR", gse_oot1$title), "Rejection", "Stable")
+```
+
+
+
+```{r}
+fit_oot2 <- topTable(fit14346, genelist = featureData14346[, "ID"], n = Inf) |> 
+  rownames_to_column("row") |> 
+  filter(!is.na(ID)) |> 
+  filter(ID != "") |> 
+  group_by(ID) |> 
+  filter(P.Value == min(P.Value)) |> 
+  pull(row)
+
+gse_oot2 <- gse14346[fit_oot2]
+gse_oot2$Outcome = ifelse(grepl("AR", gse_oot2$title), "Rejection", "Stable")
+```
+## Machine Learning Model
+
+### In-sample Test
+
+However, it is still necessary to check the accuracy of the genes obtained. Machine learning predicts the result of transplant, whether it is stable or rejection, using the highly differentiated genes. The code below conduct in sample test for the highly differentiated genes found, compare the result with the gse15296's outcome to check the accuracy. Since it is a tutorial based shiny app, 3 commonly used machine learning models are deployed. And in this tutorial part the team used mean accuracy for demonstration.
+```{r}
+set.seed(3888)
+gse_top = intersect(gse14346_top,gse15296_top)
+
+X = as.matrix(t(exprs(gse15296)[gse_top,]))
+y = gse15296$Outcome
+
+cvK = 5  # number of CV folds
+
+n_sim = 50 ## number of repeats
+
+cv_acc_rf = cv_acc_knn = cv_acc_svm = c()
+cv_50acc5_rf = cv_50acc5_knn = cv_50acc5_svm = c()
+
+for (i in 1:n_sim) {
+  
+  cvSets = cvTools::cvFolds(nrow(X), cvK)  # permute all the data, into 5 folds
+  cv_acc_rf = cv_acc_knn = cv_acc_svm = c()
+  
+  for (j in 1:cvK) {
+    test_id = cvSets$subsets[cvSets$which == j]
+    X_test = X[test_id, ]
+    X_train = X[-test_id, ]
+    y_test = y[test_id]
+    y_train = y[-test_id]
+    
+    ## Random Forest
+    rf_res <- randomForest::randomForest(x = X_train, y = as.factor(y_train))
+    fit <- predict(rf_res, X_test)
+    cv_acc_rf[j] = mean(fit == y_test)
+    
+    ## SVM
+    svm_res <- e1071::svm(x = X_train, y = as.factor(y_train))
+    fit <- predict(svm_res, X_test)
+    cv_acc_svm[j] = mean(fit == y_test)
+    
+    ## KNN
+    knn_res <- class::knn(X_train, X_test, cl = y_train, k = 5)
+    cv_acc_knn[j] = mean(knn_res == y_test)
+    
+  }
+  
+  cv_50acc5_rf <- append(cv_50acc5_rf, mean(cv_acc_rf))
+  cv_50acc5_svm <- append(cv_50acc5_svm, mean(cv_acc_svm))
+  cv_50acc5_knn <- append(cv_50acc5_knn, mean(cv_acc_knn))
+  
+}
+```
+
+
+The boxplot below shows the accuracy for the 3 machine learning models, it takes in the genes found and use this to predict the transplant result in gse15296, 3 models all gives an accuracy above 80%.
+```{r}
+boxplot(cv_50acc5_svm,cv_50acc5_knn,cv_50acc5_rf,names = c("SVM","KNN","Random Forest"),main="Accuracy comparison for intersected gene names againest GSE15296")
+```
+
+
+The same process goes for gse14346
+```{r}
+set.seed(3888)
+gse_top = intersect(gse14346_top,gse15296_top)
+
+X = as.matrix(t(exprs(gse14346)[gse_top,]))
+y = gse14346$Outcome
+
+cvK = 5  # number of CV folds
+
+n_sim = 50 ## number of repeats
+
+cv_acc_rf1 = cv_acc_knn1 = cv_acc_svm1 = c()
+cv_50acc5_rf1 = cv_50acc5_knn1 = cv_50acc5_svm1 = c()
+
+for (i in 1:n_sim) {
+  
+  cvSets = cvTools::cvFolds(nrow(X), cvK)  # permute all the data, into 5 folds
+  cv_acc_rf1 = cv_acc_knn1 = cv_acc_svm1 = c()
+  
+  for (j in 1:cvK) {
+    test_id = cvSets$subsets[cvSets$which == j]
+    X_test = X[test_id, ]
+    X_train = X[-test_id, ]
+    y_test = y[test_id]
+    y_train = y[-test_id]
+    
+    ## Random Forest
+    rf_res <- randomForest::randomForest(x = X_train, y = as.factor(y_train))
+    fit <- predict(rf_res, X_test)
+    cv_acc_rf1[j] = mean(fit == y_test)
+    
+    ## SVM
+    svm_res1 <- e1071::svm(x = X_train, y = as.factor(y_train))
+    fit1 <- predict(svm_res, X_test)
+    cv_acc_svm1[j] = mean(fit == y_test)
+    
+    ## KNN
+    knn_res <- class::knn(X_train, X_test, cl = y_train, k = 5)
+    cv_acc_knn1[j] = mean(knn_res == y_test)
+    
+  }
+  
+  cv_50acc5_rf1 <- append(cv_50acc5_rf1, mean(cv_acc_rf1))
+  cv_50acc5_svm1 <- append(cv_50acc5_svm1, mean(cv_acc_svm1))
+  cv_50acc5_knn1 <- append(cv_50acc5_knn1, mean(cv_acc_knn1))
+  
+}
+```
+
+
+Boxplot here shows the accuracies around 70%.
+```{r}
+boxplot(cv_50acc5_svm1,cv_50acc5_knn1,cv_50acc5_rf1,names = c("SVM","KNN","Random Forest"),main="Accuracy comparison for intersected gene names againest GSE14346")
+```
+
+### Out of sample testing
+
+The result for in sample testing using intersected genes goes well. We have also showed a tutorial on how to conduct out of sample testing. It is to validate whether the genes obtained is a general conclusion for all kinds of blood genes related kidney transplant. However, since the app is tutorial based, we have decided to include a partitioned gse data for the out of sample testing. As the data is collected and processed using the same method. This will greatly reduce batch effect, and the potential of unmatched formats and contents. Since this is a testing feature, and we want to limit out all the factors that could have a negative impact on the accuracy.
+```{r}
+fit_oot1 <- topTable(fit15296, genelist = featureData15296[, "ID"], n = Inf) |> 
+  rownames_to_column("row") |> 
+  filter(!is.na(ID)) |> 
+  filter(ID != "") |> 
+  group_by(ID) |> 
+  filter(P.Value == min(P.Value)) |> 
+  pull(row)
+
+gse_oot1 <- gse15296[fit_oot1]
+gse_oot1$Outcome = ifelse(grepl("AR", gse_oot1$title), "Rejection", "Stable")
+```
+
+```{r,warning=FALSE}
+set.seed(3888)
+gse_top = intersect(gse14346_top,gse15296_top)
+
+X = as.matrix(t(exprs(gse15296)[gse_top,]))
+y = gse_oot1$Outcome
+
+cvK = 5  # number of CV folds
+
+n_sim = 50 ## number of repeats
+
+cv_acc_rf1 = cv_acc_knn1 = cv_acc_svm1 = c()
+cv_50acc5_rf1 = cv_50acc5_knn1 = cv_50acc5_svm1 = c()
+
+for (i in 1:n_sim) {
+  
+  cvSets = cvTools::cvFolds(nrow(X), cvK)  # permute all the data, into 5 folds
+  cv_acc_rf1 = cv_acc_knn1 = cv_acc_svm1 = c()
+  
+  for (j in 1:cvK) {
+    test_id = cvSets$subsets[cvSets$which == j]
+    X_test = X[test_id, ]
+    X_train = X[-test_id, ]
+    y_test = y[test_id]
+    y_train = y[-test_id]
+    
+    ## Random Forest
+    rf_res <- randomForest::randomForest(x = X_train, y = as.factor(y_train))
+    fit <- predict(rf_res, X_test)
+    cv_acc_rf1[j] = mean(fit == y_test)
+    
+    ## SVM
+    svm_res1 <- e1071::svm(x = X_train, y = as.factor(y_train))
+    fit1 <- predict(svm_res, X_test)
+    cv_acc_svm1[j] = mean(fit == y_test)
+    
+    ## KNN
+    knn_res <- class::knn(X_train, X_test, cl = y_train, k = 5)
+    cv_acc_knn1[j] = mean(knn_res == y_test)
+    
+  }
+  
+  cv_50acc5_rf1 <- append(cv_50acc5_rf1, mean(cv_acc_rf1))
+  cv_50acc5_svm1 <- append(cv_50acc5_svm1, mean(cv_acc_svm1))
+  cv_50acc5_knn1 <- append(cv_50acc5_knn1, mean(cv_acc_knn1))
+  
+}
+```
+
+
+
+```{r}
+boxplot(cv_50acc5_svm1,cv_50acc5_knn1,cv_50acc5_rf1,names = c("SVM","KNN","Random Forest"),main="Accuracy comparison for intersected gene names againest gse_oot1")
+```
+
+```{r}
+fit_oot2 <- topTable(fit14346, genelist = featureData14346[, "ID"], n = Inf) |> 
+  rownames_to_column("row") |> 
+  filter(!is.na(ID)) |> 
+  filter(ID != "") |> 
+  group_by(ID) |> 
+  filter(P.Value == min(P.Value)) |> 
+  pull(row)
+
+gse_oot2 <- gse14346[fit_oot2]
+gse_oot2$Outcome = ifelse(grepl("AR", gse_oot2$title), "Rejection", "Stable")
+```
+
+```{r,warning=FALSE}
+set.seed(3888)
+gse_top = intersect(gse14346_top,gse15296_top)
+
+X = as.matrix(t(exprs(gse14346)[gse_top,]))
+y = gse_oot2$Outcome
+
+cvK = 5  # number of CV folds
+
+n_sim = 50 ## number of repeats
+
+cv_acc_rf2 = cv_acc_knn2 = cv_acc_svm2 = c()
+cv_50acc5_rf2 = cv_50acc5_knn2 = cv_50acc5_svm2 = c()
+
+for (i in 1:n_sim) {
+  
+  cvSets = cvTools::cvFolds(nrow(X), cvK)  # permute all the data, into 5 folds
+  cv_acc_rf2 = cv_acc_knn2 = cv_acc_svm2 = c()
+  
+  for (j in 1:cvK) {
+    test_id = cvSets$subsets[cvSets$which == j]
+    X_test = X[test_id, ]
+    X_train = X[-test_id, ]
+    y_test = y[test_id]
+    y_train = y[-test_id]
+    
+    ## Random Forest
+    rf_res <- randomForest::randomForest(x = X_train, y = as.factor(y_train))
+    fit <- predict(rf_res, X_test)
+    cv_acc_rf2[j] = mean(fit == y_test)
+    
+    ## SVM
+    svm_res1 <- e1071::svm(x = X_train, y = as.factor(y_train))
+    fit1 <- predict(svm_res, X_test)
+    cv_acc_svm2[j] = mean(fit == y_test)
+    
+    ## KNN
+    knn_res <- class::knn(X_train, X_test, cl = y_train, k = 5)
+    cv_acc_knn2[j] = mean(knn_res == y_test)
+    
+  }
+  
+  cv_50acc5_rf2 <- append(cv_50acc5_rf2, mean(cv_acc_rf2))
+  cv_50acc5_svm2 <- append(cv_50acc5_svm2, mean(cv_acc_svm2))
+  cv_50acc5_knn2 <- append(cv_50acc5_knn2, mean(cv_acc_knn2))
+  
+}
+```
+
+
+
+```{r}
+boxplot(cv_50acc5_svm2,cv_50acc5_knn2,cv_50acc5_rf2,names = c("SVM","KNN","Random Forest"),main="Accuracy comparison for intersected gene names againest gse_oot2")
+```
+
+# Conclusion
+After the verification through machine learning models include random forest, k-nearest-neighbour and SVM, we can state that the most significant blood genes vital for the success of kidney transplant are 233816_at,200722_s_at. However, there are still limitations in our research: 1. The number of datasets we have utilised is small compared to a real-life research,so that the genes from this tutorial may not be generalised. 2. The datasets available for choosing is limited as the data processing techniques or blood sampling techniques could be different, utilising those will lead to error and incorrect results.
+
+# Student contribution
+Xinyi Ma - 500036174: Help deploy the functions in question 2, contributed in PCA plot for gse14346 and conduct both in sample and out of sample accuracy test with machine learning for the genes obtained, conduct analysis on the blood genes based on the code I write the report with Simon and Steven, attend every week's tut and help finalising the slides. 
+
+Steven Liang - 500112216:Defined the question of Question2 and helped to find the relevant dataset. I do the Power point every week. Then I analyzed the dataset of Question2 together with lucy. And assisted lucy to complete the preparation of Question2 report
+
+Simon Lan - 490568211: help design the research question 2, offer ideas and structures of question 2 analysis，help fix the bugs and solve problems encountered in the deployment process，participate in the report with EDA and machine learning report component.
+
+# References
+1. Jaadi, Z. (n.d.). A step-by-step explanation of principal component analysis (PCA),Retrieved from https://builtin.com/data-science/step-step-explanation-principal-component-analysis 
