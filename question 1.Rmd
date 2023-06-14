@@ -1,0 +1,254 @@
+---
+title: "Which type of sample, biopsy or peripheral blood, is a better predictor of kidney transplant success, and which gene is the most influential in determining success in the early stages?"
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M')`"
+author: "KIDNEY P7 - Chanel, Aagrath and Manfred"
+output: 
+  html_document: 
+    self_contained: true # Creates a single HTML file as output
+    code_folding: hide # Code folding; allows you to show/hide code chunks
+    code_download: true # Includes a menu to download the code file
+    toc: true # (Optional) Creates a table of contents!
+    toc_float: true # table of contents at the side
+    number_sections: true # (Optional) Puts numbers next to heading/subheadings
+table-of-contents: true # (Optional) Creates a table of contents!
+number-sections: true # (Optional) Puts numbers next to heading/subheadings
+
+
+---
+
+
+
+# Executive Summary
+***
+
+The survival rates of kidney transplant report stated that the rejection rate for grafts after the kidney transplant process is approximately 98.9% in the first year and gradually decreases to approximately 68.5% in the fifth year (Pakfetrat et al., 2022). When compared to the first stage after the transplant, this is considered to be a significant decrease. There are several factors contributing to the declining patient survival rates, including gene expression in patients and donors as well as the types of samples used to diagnose the rejection outcome.
+
+The main findings of this study showed that the gene symbol "CCR2" has the greatest influence on determining whether a kidney transplant succeeds or fails due to achieving the highest distance accuracy of 70.1% compared to the other seven intersect genes including "ITGA4", "PTPRC" "PDE8A", "ST8SIA4", "SLC9A9", "MYCL", and "CLEC7A" in two sample types of Blood and Biopsy. CCR2 showed bright red colours for high distance levels in the top 8 genes' distance heatmap when compared to the other seven genes. 
+
+To determine which sample types are the best predictors for both in-sample and out-of-sample data, cross-validation and SVM (Support Vector Machine) are used in machine learning deployment for prediction. Biopsy has a higher AUC of 0.9985 compared to Blood, which has a slightly lower AUC of 0.9950 for the In-Sample Roc curve.  
+
+The in-sample boxplot for in-sample vs. out-of-sample mean accuracy is regarded as invalid due to the mean accuracy for both samples is close to 100%. In comparison to blood samples, which have a mean accuracy of 0.86%, biopsies have a mean accuracy of 0.96%. Another comparison of two additional datasets in four datasets outside of the sample testing showed that Biopsy Extra dataset still has higher mean accuracy at 0.73% compared to Blood Extra dataset mean accuracy of 0.61%. 
+
+The SVM decision boundary model was applied to training and testing sets in the principal component (PCA) for blood and biopsy and yielded 0.32 accuracy results, indicating that only 32% of the outcomes in this dataset were correctly identified, whereas the biopsy decision boundary model yielded 0.80 accuracy results, indicating that approximately 80% of gene expression data points were correctly classified. To summarise, the biopsy sample is a better predictor of kidney transplant success, and the gene symbol "CCR2" is the most influential in determining success in early stages.
+
+
+# Aim and Background 
+
+Despite numerous R programming tutorials, few target bioinformatics, especially non-university courses. This is concerning as most medical researchers lack time for upskilling at universities. 
+Therefore we decided to create an app that would help determine whether blood or biopsy is a better indicator of kidney transplant success and educate medical researchers on how to do so as well. We decided to compare blood and biopsy as there are two primary methods utilized to analyze kidney transplant success and afterward conducted gene expression analysis to see which genes had the largest impact in a successful transplant. 
+This leads us to the creation of R-MEDiK. The R-MEDiK App is a web application for studying and understanding factors influencing kidney sample selection in transplant success. 
+
+
+
+# Methods - Part A
+
+In this section, we describe our approach to predicting kidney transplant success using gene expression data. We collected gene expression data from both blood and biopsy samples of kidney transplant patients. Our goal was to develop models that can accurately classify patients as either having a stable outcome or experiencing rejection based on their gene expression profiles.
+
+We employed a data science approach that involved the following steps:
+1.	Data Collection: We obtained gene expression data from blood and biopsy samples of kidney transplant patients. Gene expression levels were measured using advanced sequencing technologies, providing a comprehensive view of the transcriptomic landscape.
+2.	Model Development: We utilized Support Vector Machine (SVM) models for classification. SVM is a robust machine learning algorithm known for its ability to handle high-dimensional data and nonlinear relationships. We trained separate SVM models for blood and biopsy samples to capture the unique characteristics of each dataset.
+3.	Evaluation Strategies:
+o	ROC Curve Analysis: We used ROC curves to assess the performance of our models. ROC curves provide a visual representation of the trade-off between the true positive rate and the false positive rate for different classification thresholds. The area under the ROC curve (AUC) served as a quantitative measure of model performance.
+
+
+o	Mean Accuracy Calculation: We employed cross-validation techniques to evaluate the mean accuracy of our models. By splitting the data into training and testing subsets, we assessed the average accuracy of our models in predicting rejection or stable outcomes on both the trained data (in-sample) and new, unseen data (out-of-sample).
+	In-sample Mean Accuracy: For in-sample evaluation, we performed cross-validation on the training dataset. This process involved dividing the data into folds, training the models on a subset of the folds, and evaluating their performance on the remaining fold. The in-sample mean accuracy was then calculated by averaging the accuracy across all folds.
+	Out-of-sample Mean Accuracy: To assess the generalizability of the models, we conducted out-of-sample evaluation. We applied the trained models to an independent testing dataset, which was not used during training. Cross-validation was performed on the testing dataset by dividing the data into folds, training the models on a subset of the folds, and evaluating their performance on the remaining fold. The out-of-sample mean accuracy was calculated by averaging the accuracy across all folds.
+	By comparing the in-sample and out-of-sample mean accuracy, we gained insights into the models' performance on both the trained and unseen data, ensuring their robustness and generalizability.
+
+
+o	SVM Decision Boundary Visualization: To gain insights into the decision-making process of our models, we visualized the decision boundaries in the feature space using Principal Component Analysis (PCA). Due to samples and grid had an uneven sample and feature distribution, PCA allowed us to reduce datapoint dimensions in order to create the SVM decision boundary to observe how our models separate the classes based on gene expression patterns.
+
+Our selection of these evaluation methodologies ensured a thorough assessment of our models' performance, taking into consideration graphical, qualitative, and quantitative data.
+
+
+
+# Methods Part B
+
+For question 1, the data is collected using a dataset from the allograft rejection spreadsheet, which contains all geo databases with accession IDs. This dataset was obtained from the Gene Expression Omnibus database and assigned to a Sydney student via the kidney project page on Canvas. Most geodatabases contain information about accession IDs such as feature data and phenodata.
+In this question, two microarray datasets have been chosen, with accession numbers GSE15296 and GSE34437. GEO15296 denotes the type of peripheral blood sample, whereas GSE34437 denotes the type of biopsy sample. GEO15296 contains the gene expression of 75 blood samples, 51 of which developed graft rejection and 24 of which had a stable graft as the outcome. GSE34437, on the other hand, contains 66 biopsy samples from 13 patients who developed graft rejection and 53 patients who had stable graft outcomes.
+According to these results, the rejection and stable outcomes are not equal in both datasets, and more analysis is required to ensure the data’s consistency. We aim to investigate which of these two samples is a better predictor of kidney transplant success in the early stages.
+
+# Results - Part A
+
+Based on our evaluation strategies, we present the following findings:
+1.	ROC Curve Analysis: The ROC curves demonstrated the performance of our models in distinguishing between rejection and stable outcomes. The AUC values provided a quantitative measure of the model's discriminative ability. The biopsy model exhibited a higher AUC value (0.9985) compared to the blood model (0.9950), demonstrating the blood model's inferior predictive ability. Due to AUC values above 90 and close to 100%, both models’ performances are regarded as perfect classifiers in terms of effectiveness. In this case, biopsy sample methods are preferable due to their exceptional accuracy but we cannot draw the conclusion yet. As the ROC curve performance accuracy of the biopsy and blood sample are comparable and nearly equal, we need more matrices to test the predictions of both.
+2.	Mean Accuracy Calculation: Cross-validation techniques were employed to evaluate the accuracy of our models.
+a.	In-sample mean accuracy: Cross-validation within the training dataset revealed near-perfect mean accuracy scores for both the biopsy and blood models. These scores approached 100%, indicating their exceptional classification performance within the training data.
+b.	Out-of-sample mean accuracy: Cross-validation was performed using an independent testing dataset to determine generalizability. In the out-of-sample test, the biopsy model outperformed the blood model, which had a mean accuracy of 32% and a mean accuracy range of 87-95%. These findings demonstrate the biopsy model's greater ability to predict outcomes from fresh, untested data.
+3.	SVM Decision Boundary Visualization: We visualised the decision boundaries of our models using PCA for dimensionality reduction. The biopsy model distinguished between rejection and stable outcomes, whereas the blood model contained more misclassifications and overlapping regions. The biopsy decision boundary model classified rejection and stable outcomes with an accuracy of 80%. This means that the majority of gene expression data points were correctly classified. The biopsy SVM decision boundary model outperforms the blood model, proving its superiority.
+
+In conclusion, the combined ROC curve analysis, in-sample and out-of-sample mean accuracy calculation and decision boundary visualisation results significantly demonstrate the biopsy model's superiority in accurately predicting kidney transplant outcomes. These findings will help clinicians and researchers improve patient outcomes and optimise treatment choices.
+
+
+
+
+
+
+# Results - Part B
+
+In this section we will describe the contents of the shiny app created for our product R-MEDiK.
+
+List of stages in Shiny app:
+1. Data collection
+2. Data cleaning
+3. Data wrangling
+4. Exploratory Data Analysis
+5. Data Evaluation
+
+After this, we move on to the “Data Collection” tab.
+Step 1: Gathering Information about the Dataset, 
+Step 2: Measuring information.
+In this step, we aim to measure the information corresponding to each selected sample type, we get this summary.
+Example:
+Total features: 54675 
+Total samples: 75 
+Rejection count: 51 
+Stable count: 24
+Step 3: Challenges
+The list of challenges that will arise when integrating these columns into the data evaluation stage.
+Example:
+“Our Challenges:
+Rejection count (51) is higher than Stable count (24). Rejection and stable outcomes from this dataset are not equal. To check for normalisation in these unequal outcomes, we will need to go through cleaning, wrangling, and Exploratory Data Analysis. Next, proceed to the Data Cleaning stage.”
+
+________________________________________
+
+Now we move on to data cleaning.
+Step 1: Evaluating Feature Data (RAW)
+In this step, check for any missing or empty Gene symbols, IDs, or NA values in both raw feature data datasets. The user can choose from the sample types in the drop-down menus below based on their interests.
+Step 2: Filtering Options
+In this second step, researchers have to filter and combine Samplename or geo_accession and Gene Expression ID in PhenoData with ID in FeatureData in order to match ID in order to integrate Gene Symbol and other information. Also, any NA or empty rows are found and removed is applied. Further, converting the rejection and stable results into comparable circumstances using matrix functions for PhenoData.
+Afterward, we describe to the user how to filter options.
+Step 3: Transforming to Cleaned - Blood
+The third step involves applying to raw featureData all the filtering options mentioned in step 2 that are linked by ID with phenodata and featureData. To convert unclean data to clean data, the user can click the Apply Filter button.
+
+________________________________________
+
+The third stage, Data Wrangling consists of a single step where the researcher can map data into a structural format for analysis. 
+Step 1: Analyzing Top expressed genes
+In this step, we want to reduce the size of the gene expression sample in order to figure out whether blood samples or biopsy are more accurate at predicting kidney transplants. We show the user the top 300 genes with different expression levels.	Afterward, we provide the user the option to select the number of genes since the size of gene expression depends on your research question and goal. 
+
+________________________________________
+
+Afterward, we move on to exploratory data analysis.
+Step 1: Finding General Patterns
+The process involved incorporating log-transformation for different blood and biopsy sample types as well as examining the distribution and normalization of the data. 
+Afterward, we define a box plot to the user and display the output as can be seen in the example below:
+Example:
+  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  1.197   2.789   4.073   4.575   5.984  14.134
+
+________________________________________
+
+The fifth and final stage data evaluation determines the final outcome of the research question that has been addressed in stages one through four. 
+It includes one step in which we have to examine the ROC curve, the in-sample and out-of-sample mean accuracy, and the accuracy summaries to determine which sample types, blood or biopsy, are better for predicting kidney success.
+Step 1: Evaluating Machine Learning Models
+In this step, we will visually evaluate the roc curve as well as the in-sample and out-of-sample mean accuracy. Then, we'll take a look at the statistical summaries of these two machine-learning models.
+In sample: Receiver Operating Characteristic (ROC) Curve
+we give the user sliders for False Positive Rate Range, and True Positive Rate Range. Distance Range including their definition to aid the user in understanding this statistical information.
+Underneath we include a summary of the ROC curve results for the user
+
+In sample & Out sample: Mean Accuracy (%)
+In this section we define Mean accuracy which is a percentage that represents the average correctness of a model's predictions.
+
+After we give the users a Mean Accuracy Range which allows them to modify the mean accuracy parameters for both in-sample and out-of-sample mean accuracy using the slider options.
+
+
+# Discussion and conclusion 
+
+There are two significant limitations to this study's analysis that are related to the use of SVM decision boundary methods and identifying the intersect genes with the greatest influence on the R-Medik shiny application product.  
+
+Blood and biopsy sample data frames were used in the SVM decision boundary from the out-of-sample training and testing set.  Check the grid to make sure the sample taken from both samples is accurate and prepared for dimension reduction in the principal component. Match and trim training and testing tests using the row count () function if the row is unbalanced. The SVM model was used to visualise the decision boundary using PCA-transformed data and the mash grid function.
+
+This whole concept was adapted from the textbook “ The Elements of Statistical Learning” (Hastie et al., 2017) in order to separate the two classes from the training set, which included rejection and stable outcomes in this case. The results of the decision boundary plot showed that there were patterns with accurate results, yet due to the PCA-transformed process had not fully adjusted the unclassified grid for biopsy sample, we were unable to determine how the relationship between rejection and stable can be used to predict new and unseen data.
+
+Additionally, due to the complexity of the dataset’s columns and rows, decision boundary methods are considered as being too complex for blood and biopsy samples.  A different approach to resolving these issues is presented in Slides 18–19 from the STAT3888: Statistical Machine Learning Material, which also provides descriptions of SVM decision boundary coding and strategies for coping with the complexity of data columns and rows (Ormerod, 2022).  This study may apply these steps to further develop in the future work.
+
+Furthermore, a few challenges are also present during the R-MEDiK shiny applications' production stage. The initial goal of developing the application was to use different matrices to identify the best sample type and identify the gene expression for predicting the success of kidney transplants. Due to incomplete research regarding gene expression analysis, the application's original goal was changed, and its current purpose is to offer tutorials on how to apply two machine learning models, such as the ROC curve and mean accuracy on in-sample and out-of-sample data modelling, in order to determine which sample types are the best predictors for a kidney transplant. As a result, only one question—"Determining sample type"—was added to the shiny application, which also only has two matrices and a sidebar with hard text. This was done due to there wasn't enough information to add to the shiny application. Another opportunity exists here to expand upon current products in order to fulfill the application's original intent in the future.  
+
+We were able to conclude after looking at data from 2 different datasets that biopsy is a better indicator of kidney transplant success, identify the top 8 most essential genes, and were able to fulfill our goal of building a shiny app for medical researchers. In future work we would like to add two more datasets for successful out-of-sample testing for increased accuracy of outcome, and in the shiny app, and include an upload CSV section for users to increase the usability for our app.
+
+
+
+
+
+# References
+Hastie, T., Tibshirani, R., & Friedman, J. (2017). Springer Series in Statistics The Elements of Statistical Learning Data Mining, Inference, and Prediction Second Edition.https://hastie.su.domains/ElemStatLearn/printings/ESLII_print12_toc.pdf
+
+Ormerod, J (2022). L17 - Support Vector Machines. STAT3888: Statistical Machine Learning [PowerPoint slides]. https://canvas.sydney.edu.au/groups/431912/files/31112278/download
+
+Pakfetrat, M., Malekmakan, L., Jafari, N., & Sayadi, M. (2022). Survival Rate of Renal Transplant and Factors Affecting Renal Transplant Failure. Experimental and Clinical Transplantation, 20(3), 265–272. https://doi.org/10.6002/ect.2021.0430
+
+Simplilearn. (2023, March 1). Top data science facts you should know about in 2023. Simplilearn.com. https://www.simplilearn.com/data-science-facts-article  
+
+
+# Appendices
+
+
+## Figure1: Project Workflow Diagram
+![](C:\Users\Lenovo Ideapad\Downloads\Image20230528224725.png)
+
+## Figure2: In sample and Out of Sample Diagram
+![](C:\Users\Lenovo Ideapad\Downloads\in.png)
+
+
+
+## Figure3: ROC Curve
+![](C:\Users\Lenovo Ideapad\Downloads\Roc Curve.png)
+
+
+## Figure4: In sample and out of sample Mena accuracy and 2 Extra datasets out of sample
+![](C:\Users\Lenovo Ideapad\Downloads\Mean Accuracy.png)
+
+
+## Figure5: In sample and Out of Sample Diagram
+![](C:\Users\Lenovo Ideapad\Downloads\dse.png)
+
+
+
+# External Plots and Grapghs
+
+
+## SVM Decision Boundary 
+![](C:\Users\Lenovo Ideapad\Downloads\SVM Decision Boundary.png)
+
+## Top 8 Genes Heatmap
+![](C:\Users\Lenovo Ideapad\Downloads\Heatmap.png)
+
+
+
+
+
+
+
+# Report Contribution
+
+Executive summary - Chanel
+
+Aim and background - Aagrath
+
+Method - Part A  -  Manfred
+
+Method - Part B - Aagrath
+
+Results - Part A - Manfred
+
+Results - Part B - Aagrath
+
+Discussion  - Chanel 
+
+Conclusion - Aagrath
+
+R-markdown/html report version - Chanel 
+
+# Student contribution
+
+
+“Throughout the course of the project, I have been developing a project analysis on Question 1 regarding which sample type—blood or biopsy—is a better indicator of kidney success. Participating in Kidney P7 Zoom meetings every Friday at 7 p.m., going to consultations, assisting with presentation slides, scripts, shiny workflow diagrams, and Q1 workflow diagrams, as well as developing Shiny tutorial applications and finishing the final report”. - Chanel Specter - 500436031
+
+“I have contributed by developing Question 1 (Which sample type, blood or biopsy, is a better predictor of kidney success) attending all group meetings, attending multiple consultation appointments from week 9-13, working on the final report, working on shiny workflow diagram, Q1 workflow diagram, slides, and script for the presentation.”-490601909
+
+Initially, I was developing question 2 of the project by deciding on a question and also searching for datasets that are suitable for our questions. Then, I participated in question 1 development and did a workflow diagram for question 1 and also for the shiny app. I participated in all Kidney P7 Zoom meetings on every Friday at 7 pm Sydney time and also went to consultations for question 1 and the Shiny app. I also assisted in completing the presentation slides, and scripts and designed the presentation slides' layout. Furthermore, I helped to code a few layouts for Shiny tutorial applications and finished the final report (Method and Result for part A). 
+- Yin You Manfred Koh 510668042
+
+
